@@ -1,4 +1,4 @@
-export default class JSON<T extends object> {
+export default class JSON<T> {
   index: number = 0;
 
   public static parse(tokens: string[]): T | T[] | undefined {
@@ -132,7 +132,7 @@ export default class JSON<T extends object> {
     }
   }
 
-  private serializeObject(obj: object): string {
+  private serializeObject(obj: any): string {
     let result = "{";
     const keys = Object.keys(obj);
     for (let i = 0; i < keys.length; i++) {
@@ -169,11 +169,88 @@ export default class JSON<T extends object> {
     return `${value}`;
   }
 
-  private parseObject(tokens: string[]) {}
-  private parseString(tokens: string[]) {}
-  private parseDate(tokens: string[]) {}
-  private parseArray(tokens: string[]) {}
-  private parseTrue(tokens: string[]) {}
-  private parseFalse(tokens: string[]) {}
-  private parseNumber(tokens: string[]) {}
+  private parseObject(tokens: any[]) {
+    const obj: { [key: string]: any } = {};
+    if (tokens[this.index] === "{") {
+      this.index++;
+      while (tokens[this.index]?.value !== "}") {
+        const key = tokens[this.index]?.value;
+        if (!key || tokens[this.index + 1]?.value !== ":") {
+          throw new SyntaxError("Invalid object structure");
+        }
+        this.index += 2; // Move past key and ":"
+        const value = this.parseValue(tokens);
+        obj[key] = value;
+        if (tokens[this.index]?.value === ",") {
+          this.index++; // Move past ","
+        }
+      }
+      if (tokens[this.index]?.value !== "}") {
+        throw new SyntaxError("Missing closing brace for object");
+      }
+      this.index++; // Move past the closing brace
+      return obj;
+    } else {
+      throw new SyntaxError("Invalid object structure");
+    }
+  }
+
+  private parseString(tokens: any[]) {
+    if (tokens[this.index]?.type === "string") {
+      const value = tokens[this.index]?.value;
+      this.index++;
+      return value;
+    } else {
+      throw new SyntaxError("Invalid string");
+    }
+  }
+
+  private parseArray(tokens: any[]) {
+    const arr: any[] = [];
+    if (tokens[this.index] === "[") {
+      this.index++;
+      while (tokens[this.index]?.value !== "]") {
+        const value = this.parseValue(tokens);
+        arr.push(value);
+        if (tokens[this.index]?.value === ",") {
+          this.index++; // Move past ","
+        }
+      }
+      if (tokens[this.index]?.value !== "]") {
+        throw new SyntaxError("Missing closing bracket for array");
+      }
+      this.index++; // Move past the closing bracket
+      return arr;
+    } else {
+      throw new SyntaxError("Invalid array structure");
+    }
+  }
+
+  private parseTrue(tokens: any[]) {
+    if (tokens[this.index]?.value === "true") {
+      this.index++;
+      return true;
+    } else {
+      throw new SyntaxError("Invalid true value");
+    }
+  }
+
+  private parseFalse(tokens: any[]) {
+    if (tokens[this.index]?.value === "false") {
+      this.index++;
+      return false;
+    } else {
+      throw new SyntaxError("Invalid false value");
+    }
+  }
+
+  private parseNumber(tokens: any[]) {
+    if (tokens[this.index]?.type === "number") {
+      const value = tokens[this.index]?.value;
+      this.index++;
+      return value;
+    } else {
+      throw new SyntaxError("Invalid number");
+    }
+  }
 }
