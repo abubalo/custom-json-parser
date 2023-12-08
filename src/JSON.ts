@@ -1,11 +1,16 @@
-export default class JSON<T> {
+export class JSON<T> {
   index: number = 0;
 
-  public static parse(tokens: string[]): T | T[] | undefined {
-    return;
+  public static parse(jsonStrings: string) {
+    const tokens = new JSON().tokenize(jsonStrings);
+    return new JSON().parseValue(tokens);
   }
 
-  private tokenize(jsonString: any) {
+  public static strigify(tokens: unknown): string {
+    return new JSON().serializeValue(tokens);
+  }
+
+private tokenize(jsonString: string) {
     const tokens = [];
     let index = 0;
 
@@ -83,10 +88,10 @@ export default class JSON<T> {
     return tokens;
   }
 
-  private parseValue(tokens: string[]) {
-    const char = tokens[this.index];
+  private parseValue(tokens: { type: string; value: any }[]) {
+    const token = tokens[this.index];
 
-    switch (char) {
+    switch (token.type) {
       case "{":
         return this.parseObject(tokens);
       case "[":
@@ -99,16 +104,12 @@ export default class JSON<T> {
         return this.parseFalse(tokens);
 
       default:
-        if (/[\d-.]/.test(char)) {
+        if (/[\d-.]/.test(token.type)) {
           return this.parseNumber(tokens);
         } else {
           throw new SyntaxError("Unexpected character while parsing value");
         }
     }
-  }
-
-  public serialize(tokens: string[]): string {
-    return this.serializeValue(tokens);
   }
 
   private serializeValue(value: any): string {
