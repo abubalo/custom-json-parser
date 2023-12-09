@@ -1,16 +1,35 @@
-export class JSON<T> {
+/**
+ * Represntation of JSON parser and serializer
+ */
+
+export class JSON {
   index: number = 0;
 
+  /**
+   * Parses JSON string into its coresponding Javascript value.
+   * @param jsonStrings The JSON string to parse.
+   * @returns
+   */
   public static parse(jsonStrings: string) {
     const tokens = new JSON().tokenize(jsonStrings);
     return new JSON().parseValue(tokens);
   }
 
+  /**
+   * Serializes a Javascript value into JSON string.
+   * @param {unknown} tokens Javascript value to be serialize.
+   * @returns {string} JSON string representation.
+   */
   public static strigify(tokens: unknown): string {
     return new JSON().serializeValue(tokens);
   }
 
-private tokenize(jsonString: string) {
+  /**
+   * Tokenizes JSON string into array of tokens
+   * @param jsonString The string JSONs to tokinze
+   * @returns {Array<{ type: string; value: any }>} Array of token object
+   */
+  private tokenize(jsonString: string) {
     const tokens = [];
     let index = 0;
 
@@ -87,7 +106,12 @@ private tokenize(jsonString: string) {
 
     return tokens;
   }
-
+  /**
+   * Parses JSON tokens and returns the corresponding JavaScript value.
+   * @param {Array<{ type: string; value: any }>} tokens - Array of token objects with 'type' and 'value' properties.
+   * @returns {any} Parsed JavaScript value corresponding to the tokens.
+   * @throws {SyntaxError} Throws an error if an unexpected character or token is encountered.
+   */
   private parseValue(tokens: { type: string; value: any }[]) {
     const token = tokens[this.index];
 
@@ -148,6 +172,11 @@ private tokenize(jsonString: string) {
     return result;
   }
 
+  /**
+   * Serializes a JavaScript array into a JSON array.
+   * @param {any[]} arr - The JavaScript array to be serialized.
+   * @returns {string} JSON string representation of the array.
+   */
   private serializeArray(arr: any[]): string {
     let result = "[";
     for (let i = 0; i < arr.length; i++) {
@@ -159,17 +188,33 @@ private tokenize(jsonString: string) {
     result += "]";
     return result;
   }
-
+  /**
+   * Serializes a JavaScript string into a JSON string.
+   * @param {string} value - The JavaScript string to be serialized.
+   * @returns {string} JSON string representation of the string.
+   * @private
+   */
   private serializeString(value: string): string {
     // Implement string serialization (escaping characters if needed)
     return `"${value}"`;
   }
-
+  /**
+   * Serializes a JavaScript primitive into a JSON string.
+   * @param {(number | boolean | null)} value - The JavaScript primitive to be serialized.
+   * @returns {string} JSON string representation of the primitive.
+   * @private
+   */
   private serializePrimitive(value: number | boolean | null): string {
     // Serialize numbers, booleans, and null
     return `${value}`;
   }
 
+  /**
+   * Parses a JSON object from tokens.
+   * @param {any[]} tokens - Array of token objects.
+   * @returns {object} Parsed JavaScript object.
+   * @private
+   */
   private parseObject(tokens: any[]) {
     const obj: { [key: string]: any } = {};
     if (tokens[this.index] === "{") {
@@ -195,7 +240,12 @@ private tokenize(jsonString: string) {
       throw new SyntaxError("Invalid object structure");
     }
   }
-
+  /**
+   * Parses a JSON string from tokens.
+   * @param {any[]} tokens - Array of token objects.
+   * @returns {string} Parsed JavaScript string.
+   * @private
+   */
   private parseString(tokens: any[]) {
     if (tokens[this.index]?.type === "string") {
       const value = tokens[this.index]?.value;
@@ -206,6 +256,12 @@ private tokenize(jsonString: string) {
     }
   }
 
+  /**
+   * Parses a JSON array from tokens.
+   * @param {any[]} tokens - Array of token objects.
+   * @returns {any[]} Parsed JavaScript array.
+   * @private
+   */
   private parseArray(tokens: any[]) {
     const arr: any[] = [];
     if (tokens[this.index] === "[") {
@@ -226,7 +282,12 @@ private tokenize(jsonString: string) {
       throw new SyntaxError("Invalid array structure");
     }
   }
-
+  /**
+   * Parses a JSON true value from tokens.
+   * @param {any[]} tokens - Array of token objects.
+   * @returns {boolean} Parsed JavaScript true value.
+   * @private
+   */
   private parseTrue(tokens: any[]) {
     if (tokens[this.index]?.value === "true") {
       this.index++;
@@ -235,7 +296,12 @@ private tokenize(jsonString: string) {
       throw new SyntaxError("Invalid true value");
     }
   }
-
+  /**
+   * Parses a JSON false value from tokens.
+   * @param {any[]} tokens - Array of token objects.
+   * @returns {boolean} Parsed JavaScript false value.
+   * @private
+   */
   private parseFalse(tokens: any[]) {
     if (tokens[this.index]?.value === "false") {
       this.index++;
@@ -244,7 +310,12 @@ private tokenize(jsonString: string) {
       throw new SyntaxError("Invalid false value");
     }
   }
-
+  /**
+   * Parses a JSON number from tokens.
+   * @param {any[]} tokens - Array of token objects.
+   * @returns {number} Parsed JavaScript number.
+   * @private
+   */
   private parseNumber(tokens: any[]) {
     if (tokens[this.index]?.type === "number") {
       const value = tokens[this.index]?.value;
