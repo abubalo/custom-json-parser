@@ -1,6 +1,7 @@
 # Custom JSON Data Serializer
 
-This project serves as a personal learning experience to explore the inner workings of JSON data serialization. It aims to implement a custom JSON serialization mechanism from scratch, extending its functionality to support additional data types like Date and Time.
+This project serves as a personal learning experience to explore the inner workings of JSON data serialization. It aims to implement a custom JSON serialization mechanism from scratch.
+<!-- , extending its functionality to support additional data types like Date and Time. -->
 
 ## Objectives
 - Conceptual Understanding: Gain a comprehensive understanding of JSON data serialization principles and techniques.
@@ -16,7 +17,8 @@ Upon completion of this project, I should have a clear understanding of:
 - Handling various data types in JSON serialization
 - Utilizing TypeScript's type system for data integrity
 ## Project Scope
-This project focuses on implementing a custom JSON serialization mechanism in TypeScript, with a primary focus on understanding the underlying concepts and techniques. It extends the standard JSON functionality to support Date and Time data types.
+This project focuses on implementing a custom JSON serialization mechanism in TypeScript, with a primary focus on understanding the underlying concepts and techniques. 
+<!-- It extends the standard JSON functionality to support Date and Time data types. -->
 
 ## Future Enhancements
 While the project's primary goal is learning-oriented, potential future enhancements could include:
@@ -34,36 +36,37 @@ Custom JSON stringify and parse methods:
 - TypeScript type safety: Ensures type safety throughout the serialization and deserialization process.
 - User-friendly API: Easy-to-understand and use functions for serializing and deserializing data.
 
+## Example
 ```ts
-import { JSONSerialization } from 'json-serialization-ts';
+import { JSON } from './JSON';
 
 // Serialization example
 const obj: { name: string; age: number; dob: Date } = {
   name: 'John Doe',
   age: 30,
-  dob: new Date('1992-10-01'),
+  gender: "Male"
 };
 
-const serializedData = JSONSerialization.stringify(obj);
-console.log(serializedData); // Output: '{"name":"John Doe","age":30,"dob":"1992-10-01"}'
+const serializedData = JSON.stringify(obj);
+console.log(serializedData); // Output: '{"name":"John Doe", "gender": "Male"}'
 
 // Deserialization example
-const deserializedData = JSONSerialization.parse(serializedData);
-console.log(deserializedData); // Output: { name: 'John Doe', age: 30, dob: Date('1992-10-01') }
+const deserializedData = JSON.parse(serializedData);
+console.log(deserializedData); // Output: { name: "John Doe", gender: "Male" }
 ```
 
 ## Supported Data Types
 ### Primitive types 
-- Numbers
-- Strings
-- Booleans
+- Number
+- String
+- Boolean
 ### Primitive types
-- Arrays
-- Objects
-- Date and Time
-- Binary Data Support
+- Array
+- Object
+<!-- - Date and Time
+- Binary Data Support -->
 
-Binary data support is not currently implemented, but it may be added in future versions of the library.
+<!-- Binary data support is not currently implemented, but it may be added in future versions of the library. -->
 
 
 ## License
