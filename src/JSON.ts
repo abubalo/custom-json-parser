@@ -192,7 +192,6 @@ export class JSON {
    * Serializes a JavaScript string into a JSON string.
    * @param {string} value - The JavaScript string to be serialized.
    * @returns {string} JSON string representation of the string.
-   * @private
    */
   private serializeString(value: string): string {
     // Implement string serialization (escaping characters if needed)
@@ -202,7 +201,6 @@ export class JSON {
    * Serializes a JavaScript primitive into a JSON string.
    * @param {(number | boolean | null)} value - The JavaScript primitive to be serialized.
    * @returns {string} JSON string representation of the primitive.
-   * @private
    */
   private serializePrimitive(value: number | boolean | null): string {
     // Serialize numbers, booleans, and null
@@ -213,7 +211,6 @@ export class JSON {
    * Parses a JSON object from tokens.
    * @param {any[]} tokens - Array of token objects.
    * @returns {object} Parsed JavaScript object.
-   * @private
    */
   private parseObject(tokens: any[]) {
     const obj: { [key: string]: any } = {};
@@ -244,7 +241,6 @@ export class JSON {
    * Parses a JSON string from tokens.
    * @param {any[]} tokens - Array of token objects.
    * @returns {string} Parsed JavaScript string.
-   * @private
    */
   private parseString(tokens: any[]) {
     if (tokens[this.index]?.type === "string") {
@@ -260,7 +256,6 @@ export class JSON {
    * Parses a JSON array from tokens.
    * @param {any[]} tokens - Array of token objects.
    * @returns {any[]} Parsed JavaScript array.
-   * @private
    */
   private parseArray(tokens: any[]) {
     const arr: any[] = [];
@@ -286,7 +281,6 @@ export class JSON {
    * Parses a JSON true value from tokens.
    * @param {any[]} tokens - Array of token objects.
    * @returns {boolean} Parsed JavaScript true value.
-   * @private
    */
   private parseTrue(tokens: any[]) {
     if (tokens[this.index]?.value === "true") {
@@ -300,7 +294,6 @@ export class JSON {
    * Parses a JSON false value from tokens.
    * @param {any[]} tokens - Array of token objects.
    * @returns {boolean} Parsed JavaScript false value.
-   * @private
    */
   private parseFalse(tokens: any[]) {
     if (tokens[this.index]?.value === "false") {
@@ -314,7 +307,6 @@ export class JSON {
    * Parses a JSON number from tokens.
    * @param {any[]} tokens - Array of token objects.
    * @returns {number} Parsed JavaScript number.
-   * @private
    */
   private parseNumber(tokens: any[]) {
     if (tokens[this.index]?.type === "number") {
