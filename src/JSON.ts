@@ -20,7 +20,7 @@ export class JSON {
    * @param {unknown} tokens Javascript value to be serialize.
    * @returns {string} JSON string representation.
    */
-  public static strigify(tokens: unknown): string {
+  public static stringify(tokens: unknown): string {
     return new JSON().serializeValue(tokens);
   }
 
