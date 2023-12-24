@@ -1,17 +1,17 @@
-import { JSON } from '../src/JSON'; // Replace with the correct path to your JSON class file
+import { _JSON } from '../src/JSON'; // Replace with the correct path to your JSON class file
 
 describe('JSON Class', () => {
   describe('parse method', () => {
     it('should parse a valid JSON string into corresponding JavaScript value', () => {
       const jsonString = '{"key": "value", "array": [1, 2, 3]}';
-      const parsedValue = JSON.parse(jsonString);
+      const parsedValue = _JSON.parse(jsonString);
       const expectedValue = { key: 'value', array: [1, 2, 3] };
       expect(parsedValue).toEqual(expectedValue);
     });
 
     it('should throw a SyntaxError for an invalid JSON string', () => {
       const invalidJsonString = '{ key: "value" }'; // Invalid JSON due to key without quotes
-      expect(() => JSON.parse(invalidJsonString)).toThrow(SyntaxError);
+      expect(() => _JSON.parse(invalidJsonString)).toThrow(SyntaxError);
     });
   });
 
