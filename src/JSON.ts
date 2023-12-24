@@ -2,7 +2,7 @@
  * Represntation of JSON parser and serializer
  */
 
-export class JSON {
+ export class _JSON {
   index: number = 0;
 
   /**
@@ -11,8 +11,9 @@ export class JSON {
    * @returns
    */
   public static parse(jsonStrings: string) {
-    const tokens = new JSON().tokenize(jsonStrings);
-    return new JSON().parseValue(tokens);
+    const customJSON = new _JSON();
+    const tokens = customJSON.tokenize(jsonStrings);
+    return customJSON.parseValue(tokens);
   }
 
   /**
@@ -20,8 +21,9 @@ export class JSON {
    * @param {unknown} tokens Javascript value to be serialize.
    * @returns {string} JSON string representation.
    */
-  public static stringify(tokens: unknown): string {
-    return new JSON().serializeValue(tokens);
+  public static stringify(value: unknown): string {
+    const customeJSON = new _JSON();
+    return customeJSON.serializeValue(value);
   }
 
   /**
