@@ -2,7 +2,7 @@
  * Represntation of JSON parser and serializer
  */
 
- export class _JSON {
+export class _JSON {
   index: number = 0;
 
   /**
@@ -44,14 +44,7 @@
         continue;
       }
 
-      if (
-        char === "{" ||
-        char === "}" ||
-        char === "[" ||
-        char === "]" ||
-        char === "," ||
-        char === ":"
-      ) {
+      if ("{}{}:,".includes(char)) {
         tokens.push({ type: "punctuation", value: char });
         index++;
         continue;
@@ -64,6 +57,10 @@
         while (jsonString[index] !== '"') {
           stringValue += jsonString[index];
           index++;
+        }
+
+        if (index === length) {
+          throw new SyntaxError("Unterminated string");
         }
 
         tokens.push({ type: "string", value: stringValue });
@@ -142,6 +139,8 @@
     if (typeof value === "object" && value !== null) {
       if (Array.isArray(value)) {
         return this.serializeArray(value);
+      } else if (value instanceof Date) {
+        return `"${value.toISOString()}"`; // Serialize Date objects as ISO strings
       } else {
         return this.serializeObject(value);
       }
@@ -160,18 +159,11 @@
   }
 
   private serializeObject(obj: any): string {
-    let result = "{";
     const keys = Object.keys(obj);
-    for (let i = 0; i < keys.length; i++) {
-      const key = keys[i];
-      const value = obj[key];
-      if (i > 0) {
-        result += ",";
-      }
-      result += `"${key}":${this.serializeValue(value)}`;
-    }
-    result += "}";
-    return result;
+    const serializedKeys = keys.map(
+      (key) => `"${key}":"${this.serializeValue(obj[key])}"`
+    );
+    return `${serializedKeys.join(", ")}`;
   }
 
   /**
@@ -180,33 +172,71 @@
    * @returns {string} JSON string representation of the array.
    */
   private serializeArray(arr: any[]): string {
-    let result = "[";
-    for (let i = 0; i < arr.length; i++) {
-      if (i > 0) {
-        result += ",";
-      }
-      result += this.serializeValue(arr[i]);
-    }
-    result += "]";
-    return result;
+    const serializeValues = arr.map((value) => this.serializeValue(value));
+    return `[${serializeValues.join(", ")}]`;
   }
   /**
-   * Serializes a JavaScript string into a JSON string.
+   * Serializes a JavaScript string into a JSON string, escaping special characters.
    * @param {string} value - The JavaScript string to be serialized.
-   * @returns {string} JSON string representation of the string.
+   * @returns {string} JSON string representation of the input string with escaped special characters.
    */
   private serializeString(value: string): string {
-    // Implement string serialization (escaping characters if needed)
-    return `"${value}"`;
+    // Replace special characters with their respective escape sequences
+    const escapedValue = value.replace(
+      /[\u0000-\u001F"\\]/g,
+      (match: string) => {
+        switch (match) {
+          case '"':
+            return '\\"'; // Escape double quote
+          case "\\":
+            return "\\\\"; // Escape backslash
+          case "\b":
+            return "\\b"; // Escape backspace
+          case "\f":
+            return "\\f"; // Escape form feed
+          case "\n":
+            return "\\n"; // Escape newline
+          case "\r":
+            return "\\r"; // Escape carriage return
+          case "\t":
+            return "\\t"; // Escape tab
+          default:
+            // For control characters and other special characters, escape as unicode
+            return `\\u${("0000" + match.charCodeAt(0).toString(16)).slice(
+              -4
+            )}`;
+        }
+      }
+    );
+
+    return `"${escapedValue}"`;
   }
+
   /**
    * Serializes a JavaScript primitive into a JSON string.
    * @param {(number | boolean | null)} value - The JavaScript primitive to be serialized.
    * @returns {string} JSON string representation of the primitive.
    */
   private serializePrimitive(value: number | boolean | null): string {
-    // Serialize numbers, booleans, and null
-    return `${value}`;
+    switch (value) {
+      case null:
+        return "null"; // Serialize null as 'null'
+      case undefined:
+        return "undefined"; // Serialize null as 'null'
+      case typeof value === "boolean":
+        return value ? "true" : "false"; // Serialize boolean as 'true' or 'false'
+      case typeof value === "number":
+        if (Number.isFinite(value)) {
+          return `${value}`; // Serialize finite numbers as their string representation
+        } else {
+          throw new Error("Unsupported number value encountered."); // Throw error for non-finite numbers (NaN, Infinity, -Infinity)
+        }
+      case null:
+        return "null";
+
+      default:
+        throw new Error("Unsupported value type encountered."); // Throw error for unsupported types (undefined, symbol, etc.)
+    }
   }
 
   /**
@@ -216,28 +246,35 @@
    */
   private parseObject(tokens: any[]) {
     const obj: { [key: string]: any } = {};
-    if (tokens[this.index] === "{") {
-      this.index++;
-      while (tokens[this.index]?.value !== "}") {
-        const key = tokens[this.index]?.value;
-        if (!key || tokens[this.index + 1]?.value !== ":") {
-          throw new SyntaxError("Invalid object structure");
-        }
-        this.index += 2; // Move past key and ":"
-        const value = this.parseValue(tokens);
-        obj[key] = value;
-        if (tokens[this.index]?.value === ",") {
-          this.index++; // Move past ","
-        }
-      }
-      if (tokens[this.index]?.value !== "}") {
-        throw new SyntaxError("Missing closing brace for object");
-      }
-      this.index++; // Move past the closing brace
-      return obj;
-    } else {
+
+    if (tokens[this.index].value !== "{") {
       throw new SyntaxError("Invalid object structure");
     }
+
+    this.index++;
+
+    while (tokens[this.index]?.value !== "}") {
+      const key = this.parseValue(tokens);
+      if (typeof key !== "string") {
+        String(key);
+      }
+
+      if (!key || tokens[this.index + 1]?.value !== ":") {
+        throw new SyntaxError("Invalid object structure");
+      }
+      this.index++; // Move past key and ":"
+
+      const value = this.parseValue(tokens);
+      obj[key] = value;
+
+      if (tokens[this.index]?.value === ",") {
+        this.index++; // Move past ","
+      } else if (tokens[this.index]?.value !== "}") {
+        throw new SyntaxError("Missing closing brace for object");
+      }
+    }
+    this.index++; // Move past the closing brace
+    return obj;
   }
   /**
    * Parses a JSON string from tokens.
@@ -261,23 +298,26 @@
    */
   private parseArray(tokens: any[]) {
     const arr: any[] = [];
-    if (tokens[this.index] === "[") {
-      this.index++;
-      while (tokens[this.index]?.value !== "]") {
-        const value = this.parseValue(tokens);
-        arr.push(value);
-        if (tokens[this.index]?.value === ",") {
-          this.index++; // Move past ","
-        }
-      }
-      if (tokens[this.index]?.value !== "]") {
-        throw new SyntaxError("Missing closing bracket for array");
-      }
-      this.index++; // Move past the closing bracket
-      return arr;
-    } else {
-      throw new SyntaxError("Invalid array structure");
+
+    if (tokens[this.index].value !== "]") {
+      throw new SyntaxError("Invlid array structure");
     }
+
+    this.index++;
+
+    while (tokens[this.index]?.value !== "]") {
+      const value = this.parseValue(tokens);
+      arr.push(value);
+      if (tokens[this.index]?.value === ",") {
+        this.index++; // Move past ","
+      }
+    }
+    if (tokens[this.index]?.value !== "]") {
+      throw new SyntaxError("Missing closing bracket for array");
+    }
+
+    this.index++; // Move past the closing bracket
+    return arr;
   }
   /**
    * Parses a JSON true value from tokens.
@@ -288,9 +328,8 @@
     if (tokens[this.index]?.value === "true") {
       this.index++;
       return true;
-    } else {
-      throw new SyntaxError("Invalid true value");
     }
+    throw new SyntaxError("Invalid true value");
   }
   /**
    * Parses a JSON false value from tokens.
@@ -301,9 +340,8 @@
     if (tokens[this.index]?.value === "false") {
       this.index++;
       return false;
-    } else {
-      throw new SyntaxError("Invalid false value");
     }
+    throw new SyntaxError("Invalid false value");
   }
   /**
    * Parses a JSON number from tokens.
@@ -311,12 +349,22 @@
    * @returns {number} Parsed JavaScript number.
    */
   private parseNumber(tokens: any[]) {
-    if (tokens[this.index]?.type === "number") {
-      const value = tokens[this.index]?.value;
-      this.index++;
-      return value;
-    } else {
+    const tokenValue = tokens[this.index].value;
+    const num = Number(tokenValue);
+
+    if (isNaN(num)) {
       throw new SyntaxError("Invalid number");
     }
+
+    // Validate if the token value matches the JSON number format
+    const isValidJSONNumber =
+      /^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(tokenValue);
+
+    if (!isValidJSONNumber) {
+      throw new SyntaxError("Invalid JSON number format");
+    }
+
+    this.index++;
+    return num;
   }
 }
