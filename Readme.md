@@ -50,11 +50,11 @@ const obj = {
   gender: "Male"
 };
 
-const serializedData = JSON.stringify(obj);
+const serializedData = _JSON.stringify(obj);
 console.log(serializedData); // Output: '{"name":"John Doe", "gender": "Male"}'
 
 // Deserialization example
-const deserializedData = JSON.parse(serializedData);
+const deserializedData = _JSON.parse(serializedData);
 console.log(deserializedData); // Output: { name: "John Doe", gender: "Male" }
 ```
 
