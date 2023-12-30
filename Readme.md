@@ -24,9 +24,12 @@ This project focuses on implementing a custom JSON serialization mechanism in Ty
 While the project's primary goal is learning-oriented, potential future enhancements could include:
 
 - Performance Optimization: Optimizing the serialization and deserialization routines for enhanced performance.
-- Extensive Testing: Implementing comprehensive unit and integration tests to ensure the library's correctness and reliability.
+- Extensive Testing: Implementing comprehensive unit and integration tests to ensure the program's correctness and reliability.
 - Binary Data Support: Exploring the feasibility of incorporating binary data support in future iterations.
 Conclusion
+- Date Support: Enhancing the serializer and parser to incorporate comprehensive date handling capabilities.
+- Undefine Support: Exploring strategies to effectively manage undefined or null data states within the serialization and parsing processes, aiming for robust handling and representation of such data conditions.
+- Comment Support: Implementing a user-friendly feature enabling contextual comments within the serialized JSON.
 
 ## Features
 
@@ -38,10 +41,10 @@ Custom JSON stringify and parse methods:
 
 ## Example
 ```ts
-import { JSON } from './JSON';
+import { _JSON } from './JSON';
 
 // Serialization example
-const obj: { name: string; age: number; dob: Date } = {
+const obj = {
   name: 'John Doe',
   age: 30,
   gender: "Male"
