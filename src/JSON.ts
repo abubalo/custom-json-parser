@@ -10,9 +10,9 @@ export class _JSON {
    * @param jsonStrings The JSON string to parse.
    * @returns
    */
-  public static parse(jsonStrings: string) {
+  public static parse(jsonStrings: any) {
     const customJSON = new _JSON();
-    const tokens = customJSON.tokenize(jsonStrings);
+    const tokens = customJSON.tokenize(jsonStrings.toString());
     return customJSON.parseValue(tokens);
   }
 
