@@ -44,7 +44,7 @@ export class _JSON {
         continue;
       }
 
-      if ("{}[]:,".includes(char)) {
+      if ("[]{}:,".includes(char)) {
         tokens.push({ type: "punctuation", value: char });
         index++;
         continue;
