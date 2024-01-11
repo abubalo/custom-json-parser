@@ -1,18 +1,22 @@
-/**
- * Represntation of JSON parser and serializer
- */
+const TOKEN_TYPES = {
+  Punctuation: 'punctuation',
+  String: 'string',
+  Number: 'number',
+  Boolean: 'boolean',
+  Null: 'null',
+};
 
 export class _JSON {
-  index: number = 0;
+  position: number = 0;
 
   /**
    * Parses JSON string into its coresponding Javascript value.
    * @param jsonStrings The JSON string to parse.
    * @returns
    */
-  public static parse(jsonStrings: any) {
+  public static parse(jsonStrings: string) {
     const customJSON = new _JSON();
-    const tokens = customJSON.tokenize(jsonStrings.toString());
+    const tokens = customJSON.tokenize(jsonStrings);
     return customJSON.parseValue(tokens);
   }
 
@@ -33,47 +37,47 @@ export class _JSON {
    */
   private tokenize(jsonString: string) {
     const tokens = [];
-    let index = 0;
+    let position = 0;
 
-    while (index < jsonString.length) {
-      let char = jsonString[index];
+    while (position < jsonString.length) {
+      let char = jsonString[position];
 
       // Skip whitespace characters
       if (/\s/.test(char)) {
-        index++;
+        position++;
         continue;
       }
 
       if ("[]{}:,".includes(char)) {
-        tokens.push({ type: "punctuation", value: char });
-        index++;
+        tokens.push({ type: TOKEN_TYPES.Punctuation, value: char });
+        position++;
         continue;
       }
 
       if (char === '"') {
         let stringValue = "";
-        index++; // Move past the opening quote
+        position++; // Move past the opening quote
 
-        while (jsonString[index] !== '"') {
-          stringValue += jsonString[index];
-          index++;
+        while (jsonString[position] !== '"') {
+          stringValue += jsonString[position];
+          position++;
         }
 
-        if (index === length) {
+        if (position === jsonString.length) {
           throw new SyntaxError("Unterminated string");
         }
 
         tokens.push({ type: "string", value: stringValue });
-        index++; // Move past the closing quote
+        position++; // Move past the closing quote
         continue;
       }
 
       if (/[\d-.]/.test(char)) {
         let numberValue = "";
 
-        while (/[\d.eE+-]/.test(jsonString[index])) {
-          numberValue += jsonString[index];
-          index++;
+        while (/[\d.eE+-]/.test(jsonString[position])) {
+          numberValue += jsonString[position];
+          position++;
         }
 
         tokens.push({ type: "number", value: parseFloat(numberValue) });
@@ -81,21 +85,21 @@ export class _JSON {
       }
 
       // Handle true, false, null
-      if (jsonString.startsWith("true", index)) {
+      if (jsonString.startsWith("true", position)) {
         tokens.push({ type: "boolean", value: true });
-        index += 4;
+        position += 4;
         continue;
       }
 
-      if (jsonString.startsWith("false", index)) {
+      if (jsonString.startsWith("false", position)) {
         tokens.push({ type: "boolean", value: false });
-        index += 5;
+        position += 5;
         continue;
       }
 
-      if (jsonString.startsWith("null", index)) {
+      if (jsonString.startsWith("null", position)) {
         tokens.push({ type: "null", value: null });
-        index += 4;
+        position += 4;
         continue;
       }
 
@@ -112,7 +116,7 @@ export class _JSON {
    * @throws {SyntaxError} Throws an error if an unexpected character or token is encountered.
    */
   private parseValue(tokens: { type: string; value: any }[]) {
-    const token = tokens[this.index];
+    const token = tokens[this.position];
 
     switch (token.type) {
       case "{":
@@ -218,11 +222,10 @@ export class _JSON {
    * @returns {string} JSON string representation of the primitive.
    */
   private serializePrimitive(value: number | boolean | null): string {
+    return `${value}`
     switch (value) {
       case null:
         return "null"; // Serialize null as 'null'
-      case undefined:
-        return "undefined"; // Serialize null as 'null'
       case typeof value === "boolean":
         return value ? "true" : "false"; // Serialize boolean as 'true' or 'false'
       case typeof value === "number":
@@ -247,33 +250,33 @@ export class _JSON {
   private parseObject(tokens: any[]) {
     const obj: { [key: string]: any } = {};
 
-    if (tokens[this.index].value !== "{") {
+    if (tokens[this.position].value !== "{") {
       throw new SyntaxError("Invalid object structure");
     }
 
-    this.index++;
+    this.position++;
 
-    while (tokens[this.index]?.value !== "}") {
+    while (tokens[this.position]?.value !== "}") {
       const key = this.parseValue(tokens);
       if (typeof key !== "string") {
         String(key);
       }
 
-      if (!key || tokens[this.index + 1]?.value !== ":") {
+      if (!key || tokens[this.position + 1]?.value !== ":") {
         throw new SyntaxError("Invalid object structure");
       }
-      this.index++; // Move past key and ":"
+      this.position++; // Move past key and ":"
 
       const value = this.parseValue(tokens);
       obj[key] = value;
 
-      if (tokens[this.index]?.value === ",") {
-        this.index++; // Move past ","
-      } else if (tokens[this.index]?.value !== "}") {
+      if (tokens[this.position]?.value === ",") {
+        this.position++; // Move past ","
+      } else if (tokens[this.position]?.value !== "}") {
         throw new SyntaxError("Missing closing brace for object");
       }
     }
-    this.index++; // Move past the closing brace
+    this.position++; // Move past the closing brace
     return obj;
   }
   /**
@@ -282,9 +285,9 @@ export class _JSON {
    * @returns {string} Parsed JavaScript string.
    */
   private parseString(tokens: any[]) {
-    if (tokens[this.index]?.type === "string") {
-      const value = tokens[this.index]?.value;
-      this.index++;
+    if (tokens[this.position]?.type === "string") {
+      const value = tokens[this.position]?.value;
+      this.position++;
       return value;
     } else {
       throw new SyntaxError("Invalid string");
@@ -299,24 +302,24 @@ export class _JSON {
   private parseArray(tokens: any[]) {
     const arr: any[] = [];
 
-    if (tokens[this.index].value !== "]") {
+    if (tokens[this.position].value !== "]") {
       throw new SyntaxError("Invlid array structure");
     }
 
-    this.index++;
+    this.position++;
 
-    while (tokens[this.index]?.value !== "]") {
+    while (tokens[this.position]?.value !== "]") {
       const value = this.parseValue(tokens);
       arr.push(value);
-      if (tokens[this.index]?.value === ",") {
-        this.index++; // Move past ","
+      if (tokens[this.position]?.value === ",") {
+        this.position++; // Move past ","
       }
     }
-    if (tokens[this.index]?.value !== "]") {
+    if (tokens[this.position]?.value !== "]") {
       throw new SyntaxError("Missing closing bracket for array");
     }
 
-    this.index++; // Move past the closing bracket
+    this.position++; // Move past the closing bracket
     return arr;
   }
   /**
@@ -325,8 +328,8 @@ export class _JSON {
    * @returns {boolean} Parsed JavaScript true value.
    */
   private parseTrue(tokens: any[]) {
-    if (tokens[this.index]?.value === "true") {
-      this.index++;
+    if (tokens[this.position]?.value === "true") {
+      this.position++;
       return true;
     }
     throw new SyntaxError("Invalid true value");
@@ -337,8 +340,8 @@ export class _JSON {
    * @returns {boolean} Parsed JavaScript false value.
    */
   private parseFalse(tokens: any[]) {
-    if (tokens[this.index]?.value === "false") {
-      this.index++;
+    if (tokens[this.position]?.value === "false") {
+      this.position++;
       return false;
     }
     throw new SyntaxError("Invalid false value");
@@ -349,7 +352,7 @@ export class _JSON {
    * @returns {number} Parsed JavaScript number.
    */
   private parseNumber(tokens: any[]) {
-    const tokenValue = tokens[this.index].value;
+    const tokenValue = tokens[this.position].value;
     const num = Number(tokenValue);
 
     if (isNaN(num)) {
@@ -364,7 +367,7 @@ export class _JSON {
       throw new SyntaxError("Invalid JSON number format");
     }
 
-    this.index++;
+    this.position++;
     return num;
   }
 }
