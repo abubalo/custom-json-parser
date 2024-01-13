@@ -1,21 +1,29 @@
 const TOKEN_TYPES = {
-  Punctuation: 'punctuation',
-  String: 'string',
-  Number: 'number',
-  Boolean: 'boolean',
-  Null: 'null',
-};
+  Punctuation: "punctuation",
+  String: "string",
+  Number: "number",
+  Boolean: "boolean",
+  Null: "null",
+} as const;
 
+type TokenTypes = {
+  type: string;
+  value: any;
+};
 export class _JSON {
   position: number = 0;
+
+  private static createInstance() {
+    return new _JSON();
+  }
 
   /**
    * Parses JSON string into its coresponding Javascript value.
    * @param jsonStrings The JSON string to parse.
    * @returns
    */
-  public static parse(jsonStrings: string) {
-    const customJSON = new _JSON();
+  public static parse(jsonStrings: string): _JSON {
+    const customJSON = _JSON.createInstance();
     const tokens = customJSON.tokenize(jsonStrings);
     return customJSON.parseValue(tokens);
   }
@@ -26,8 +34,8 @@ export class _JSON {
    * @returns {string} JSON string representation.
    */
   public static stringify(value: unknown): string {
-    const customeJSON = new _JSON();
-    return customeJSON.serializeValue(value);
+    const customJSON = _JSON.createInstance();
+    return customJSON.serializeValue(value);
   }
 
   /**
@@ -48,7 +56,7 @@ export class _JSON {
         continue;
       }
 
-      if ("[]{}:,".includes(char)) {
+      if ("[]{},:".includes(char)) {
         tokens.push({ type: TOKEN_TYPES.Punctuation, value: char });
         position++;
         continue;
@@ -64,10 +72,10 @@ export class _JSON {
         }
 
         if (position === jsonString.length) {
-          throw new SyntaxError("Unterminated string");
+          throw new SyntaxError("Unterminated string at position " + position);
         }
 
-        tokens.push({ type: "string", value: stringValue });
+        tokens.push({ type: TOKEN_TYPES.String, value: stringValue });
         position++; // Move past the closing quote
         continue;
       }
@@ -80,64 +88,83 @@ export class _JSON {
           position++;
         }
 
-        tokens.push({ type: "number", value: parseFloat(numberValue) });
+        tokens.push({
+          type: TOKEN_TYPES.Number,
+          value: parseFloat(numberValue),
+        });
         continue;
       }
 
       // Handle true, false, null
       if (jsonString.startsWith("true", position)) {
-        tokens.push({ type: "boolean", value: true });
+        tokens.push({ type: TOKEN_TYPES.Boolean, value: true });
         position += 4;
         continue;
       }
 
       if (jsonString.startsWith("false", position)) {
-        tokens.push({ type: "boolean", value: false });
+        tokens.push({ type: TOKEN_TYPES.Boolean, value: false });
         position += 5;
         continue;
       }
 
       if (jsonString.startsWith("null", position)) {
-        tokens.push({ type: "null", value: null });
+        tokens.push({ type: TOKEN_TYPES.Null, value: null });
         position += 4;
         continue;
       }
 
       // If none of the above, it's likely a syntax error in the JSON
-      throw new SyntaxError("Unexpected character in JSON");
+      console.log(`Unexpected character: ${char}`);
+      throw new SyntaxError(`Unexpected character: ${char} in JSON`);
     }
 
     return tokens;
   }
+
   /**
    * Parses JSON tokens and returns the corresponding JavaScript value.
    * @param {Array<{ type: string; value: any }>} tokens - Array of token objects with 'type' and 'value' properties.
    * @returns {any} Parsed JavaScript value corresponding to the tokens.
    * @throws {SyntaxError} Throws an error if an unexpected character or token is encountered.
    */
-  private parseValue(tokens: { type: string; value: any }[]) {
+  private parseValue(tokens: Array<TokenTypes>) {
     const token = tokens[this.position];
-
+  
     switch (token.type) {
-      case "{":
-        return this.parseObject(tokens);
-      case "[":
-        return this.parseArray(tokens);
-      case '"':
+      case TOKEN_TYPES.Punctuation:
+        return this.parsePunctuation(tokens);
+      case TOKEN_TYPES.String:
         return this.parseString(tokens);
-      case "t":
-        return this.parseTrue(tokens);
-      case "f":
-        return this.parseFalse(tokens);
-
+      case TOKEN_TYPES.Number:
+        return this.parseNumber(tokens);
+      case TOKEN_TYPES.Boolean:
+        return this.parseBoolean(tokens);
+      case TOKEN_TYPES.Null:
+        return this.parseNull();
       default:
-        if (/[\d-.]/.test(token.type)) {
-          return this.parseNumber(tokens);
-        } else {
-          throw new SyntaxError("Unexpected character while parsing value");
-        }
+        console.log(`Unexpected token type while parsing value: ${token.type}`);
+        throw new SyntaxError("Unexpected token type while parsing value");
     }
   }
+  
+  private parsePunctuation(tokens: Array<TokenTypes>) {
+    const value = tokens[this.position].value;
+    this.position++;
+    return value;
+  }
+  
+  private parseBoolean(tokens: Array<TokenTypes>) {
+    const value = tokens[this.position].value === "true";
+    this.position++;
+    return value;
+  }
+  
+  private parseNull() {
+    this.position++;
+    return null;
+  }
+  
 
   private serializeValue(value: any): string {
     if (typeof value === "object" && value !== null) {
@@ -165,10 +192,11 @@ export class _JSON {
   private serializeObject(obj: any): string {
     const keys = Object.keys(obj);
     const serializedKeys = keys.map(
-      (key) => `"${key}":"${this.serializeValue(obj[key])}"`
+      (key) => `"${key}": ${this.serializeValue(obj[key])}`
     );
-    return `${serializedKeys.join(", ")}`;
+    return `{${serializedKeys.join(", ")}}`;
   }
+  
 
   /**
    * Serializes a JavaScript array into a JSON array.
@@ -185,34 +213,22 @@ export class _JSON {
    * @returns {string} JSON string representation of the input string with escaped special characters.
    */
   private serializeString(value: string): string {
-    // Replace special characters with their respective escape sequences
+    const escapeChars: Record<string, string> = {
+      '"': '\\"',
+      "\\": "\\\\",
+      "\b": "\\b",
+      "\f": "\\f",
+      "\n": "\\n",
+      "\r": "\\r",
+      "\t": "\\t",
+    };
+
     const escapedValue = value.replace(
       /[\u0000-\u001F"\\]/g,
-      (match: string) => {
-        switch (match) {
-          case '"':
-            return '\\"'; // Escape double quote
-          case "\\":
-            return "\\\\"; // Escape backslash
-          case "\b":
-            return "\\b"; // Escape backspace
-          case "\f":
-            return "\\f"; // Escape form feed
-          case "\n":
-            return "\\n"; // Escape newline
-          case "\r":
-            return "\\r"; // Escape carriage return
-          case "\t":
-            return "\\t"; // Escape tab
-          default:
-            // For control characters and other special characters, escape as unicode
-            return `\\u${("0000" + match.charCodeAt(0).toString(16)).slice(
-              -4
-            )}`;
-        }
-      }
+      (match) =>
+        escapeChars[match] ||
+        `\\u${("0000" + match.charCodeAt(0).toString(16)).slice(-4)}`
     );
-
     return `"${escapedValue}"`;
   }
 
@@ -222,7 +238,7 @@ export class _JSON {
    * @returns {string} JSON string representation of the primitive.
    */
   private serializePrimitive(value: number | boolean | null): string {
-    return `${value}`
+    return `${value}`;
     switch (value) {
       case null:
         return "null"; // Serialize null as 'null'
@@ -285,7 +301,7 @@ export class _JSON {
    * @returns {string} Parsed JavaScript string.
    */
   private parseString(tokens: any[]) {
-    if (tokens[this.position]?.type === "string") {
+    if (tokens[this.position]?.type === TOKEN_TYPES.String) {
       const value = tokens[this.position]?.value;
       this.position++;
       return value;
