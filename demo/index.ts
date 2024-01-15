@@ -35,4 +35,4 @@ const jsonString = _JSON.stringify(person);
 const jsonObject = _JSON.parse(jsonString);
 
 console.log("Serialized: ", jsonString);
-console.log("Deserialize: ", jsonObject);
+console.log("Deserialized: ", jsonObject);
