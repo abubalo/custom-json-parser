@@ -1,8 +1,5 @@
 import { _JSON } from "../src/JSON";
 
-
-
-
 const person = {
   name: "John Doe",
   age: 30,
@@ -12,34 +9,30 @@ const person = {
   address: {
     street: "123 Main St",
     zipCode: "10001",
-    country: "USA"
+    country: "USA",
   },
   grades: {
     math: 95,
     science: 88,
-    history: 75
+    history: 75,
   },
   friends: [
     {
       name: "Alice",
       age: 28,
-      isStudent: true
+      isStudent: true,
     },
     {
       name: "Bob",
       age: 32,
-      isStudent: false
-    }
-  ]
-}
-
-
+      isStudent: false,
+    },
+  ],
+};
 
 const jsonString = _JSON.stringify(person);
 
 const jsonObject = _JSON.parse(jsonString);
 
-console.log(jsonObject, jsonString);
-// console.log(`JSONString: ${jsonString} JSONObject ${jsonObject}`);
-// console.log(jsonObject)
-
+console.log("Serialized: ", jsonString);
+console.log("Deserialize: ", jsonObject);
