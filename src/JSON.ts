@@ -4,88 +4,78 @@ const TOKEN_TYPES = {
   Number: "number",
   Boolean: "boolean",
   Null: "null",
+  Date: "date",
+  Binary: "binary",
 } as const;
 
-type TokenTypes = {
+type Token<T = any> = {
   type: string;
-  value: any;
+  value: T;
 };
-export class _JSON {
-  position: number = 0;
 
-  private static createInstance() {
+export class _JSON {
+  private currentPosition: number = 0;
+
+  private static createInstance(): _JSON {
     return new _JSON();
   }
 
-  /**
-   * Parses JSON string into its coresponding Javascript value.
-   * @param jsonStrings The JSON string to parse.
-   * @returns
-   */
-  public static parse(jsonStrings: string): _JSON {
+  public static parse(jsonStrings: any, callback?: () => void): _JSON {
     const customJSON = _JSON.createInstance();
     const tokens = customJSON.tokenize(jsonStrings);
     return customJSON.parseValue(tokens);
   }
 
-  /**
-   * Serializes a Javascript value into JSON string.
-   * @param {unknown} tokens Javascript value to be serialize.
-   * @returns {string} JSON string representation.
-   */
-  public static stringify(value: unknown): string {
+  public static stringify(value: unknown, callback?: () => void): string {
     const customJSON = _JSON.createInstance();
     return customJSON.serializeValue(value);
   }
 
-  /**
-   * Tokenizes JSON string into array of tokens
-   * @param jsonString The string JSONs to tokinze
-   * @returns {Array<{ type: string; value: any }>} Array of token object
-   */
   private tokenize(jsonString: string) {
     const tokens = [];
-    let position = 0;
+    let currentPosition = 0;
 
-    while (position < jsonString.length) {
-      let char = jsonString[position];
+    while (currentPosition < jsonString.length) {
+      let char = jsonString[currentPosition];
 
       // Skip whitespace characters
       if (/\s/.test(char)) {
-        position++;
+        currentPosition++;
         continue;
       }
 
       if ("[]{},:".includes(char)) {
         tokens.push({ type: TOKEN_TYPES.Punctuation, value: char });
-        position++;
+        currentPosition++;
         continue;
       }
 
       if (char === '"') {
         let stringValue = "";
-        position++; // Move past the opening quote
+        currentPosition++; // Move past the opening quote
 
-        while (jsonString[position] !== '"') {
-          stringValue += jsonString[position];
-          position++;
+        while (jsonString[currentPosition] !== '"') {
+          stringValue += jsonString[currentPosition];
+          currentPosition++;
         }
 
-        if (position === jsonString.length) {
-          throw new SyntaxError("Unterminated string at position " + position);
+        if (currentPosition === jsonString.length) {
+          throw new SyntaxError(
+            "Unterminated string at currentPosition " + currentPosition
+          );
         }
 
         tokens.push({ type: TOKEN_TYPES.String, value: stringValue });
-        position++; // Move past the closing quote
+        currentPosition++; // Move past the closing quote
         continue;
       }
 
       if (/[\d-.]/.test(char)) {
         let numberValue = "";
 
-        while (/[\d.eE+-]/.test(jsonString[position])) {
-          numberValue += jsonString[position];
-          position++;
+        while (/[\d.eE+-]/.test(jsonString[currentPosition])) {
+          numberValue += jsonString[currentPosition];
+          currentPosition++;
         }
 
         tokens.push({
@@ -96,21 +86,21 @@ export class _JSON {
       }
 
       // Handle true, false, null
-      if (jsonString.startsWith("true", position)) {
+      if (jsonString.startsWith("true", currentPosition)) {
         tokens.push({ type: TOKEN_TYPES.Boolean, value: true });
-        position += 4;
+        currentPosition += 4;
         continue;
       }
 
-      if (jsonString.startsWith("false", position)) {
+      if (jsonString.startsWith("false", currentPosition)) {
         tokens.push({ type: TOKEN_TYPES.Boolean, value: false });
-        position += 5;
+        currentPosition += 5;
         continue;
       }
 
-      if (jsonString.startsWith("null", position)) {
+      if (jsonString.startsWith("null", currentPosition)) {
         tokens.push({ type: TOKEN_TYPES.Null, value: null });
-        position += 4;
+        currentPosition += 4;
         continue;
       }
 
@@ -122,15 +112,9 @@ export class _JSON {
     return tokens;
   }
 
-  /**
-   * Parses JSON tokens and returns the corresponding JavaScript value.
-   * @param {Array<{ type: string; value: any }>} tokens - Array of token objects with 'type' and 'value' properties.
-   * @returns {any} Parsed JavaScript value corresponding to the tokens.
-   * @throws {SyntaxError} Throws an error if an unexpected character or token is encountered.
-   */
-  private parseValue(tokens: Array<TokenTypes>) {
-    const token = tokens[this.position];
-  
+  private parseValue(tokens: Array<Token>) {
+    const token = tokens[this.currentPosition];
+
     switch (token.type) {
       case TOKEN_TYPES.Punctuation:
         return this.parsePunctuation(tokens);
@@ -143,28 +127,9 @@ export class _JSON {
       case TOKEN_TYPES.Null:
         return this.parseNull();
       default:
-        console.log(`Unexpected token type while parsing value: ${token.type}`);
         throw new SyntaxError("Unexpected token type while parsing value");
     }
   }
-  
-  private parsePunctuation(tokens: Array<TokenTypes>) {
-    const value = tokens[this.position].value;
-    this.position++;
-    return value;
-  }
-  
-  private parseBoolean(tokens: Array<TokenTypes>) {
-    const value = tokens[this.position].value === "true";
-    this.position++;
-    return value;
-  }
-  
-  private parseNull() {
-    this.position++;
-    return null;
-  }
-  
 
   private serializeValue(value: any): string {
     if (typeof value === "object" && value !== null) {
@@ -196,22 +161,12 @@ export class _JSON {
     );
     return `{${serializedKeys.join(", ")}}`;
   }
-  
 
-  /**
-   * Serializes a JavaScript array into a JSON array.
-   * @param {any[]} arr - The JavaScript array to be serialized.
-   * @returns {string} JSON string representation of the array.
-   */
   private serializeArray(arr: any[]): string {
     const serializeValues = arr.map((value) => this.serializeValue(value));
     return `[${serializeValues.join(", ")}]`;
   }
-  /**
-   * Serializes a JavaScript string into a JSON string, escaping special characters.
-   * @param {string} value - The JavaScript string to be serialized.
-   * @returns {string} JSON string representation of the input string with escaped special characters.
-   */
+
   private serializeString(value: string): string {
     const escapeChars: Record<string, string> = {
       '"': '\\"',
@@ -232,143 +187,136 @@ export class _JSON {
     return `"${escapedValue}"`;
   }
 
-  /**
-   * Serializes a JavaScript primitive into a JSON string.
-   * @param {(number | boolean | null)} value - The JavaScript primitive to be serialized.
-   * @returns {string} JSON string representation of the primitive.
-   */
   private serializePrimitive(value: number | boolean | null): string {
-    return `${value}`;
+    // return `${value}`;
+
     switch (value) {
       case null:
         return "null"; // Serialize null as 'null'
-      case typeof value === "boolean":
-        return value ? "true" : "false"; // Serialize boolean as 'true' or 'false'
-      case typeof value === "number":
-        if (Number.isFinite(value)) {
-          return `${value}`; // Serialize finite numbers as their string representation
-        } else {
-          throw new Error("Unsupported number value encountered."); // Throw error for non-finite numbers (NaN, Infinity, -Infinity)
-        }
-      case null:
-        return "null";
-
+      case true:
+        return "true"; // Serialize boolean true as 'true'
+      case false:
+        return "false"; // Serialize boolean false as 'false'
       default:
-        throw new Error("Unsupported value type encountered."); // Throw error for unsupported types (undefined, symbol, etc.)
+        return `${value}`; // Serialize finite numbers as their string representation
     }
   }
 
-  /**
-   * Parses a JSON object from tokens.
-   * @param {any[]} tokens - Array of token objects.
-   * @returns {object} Parsed JavaScript object.
-   */
+  private serializeDate(value: Date) {
+    //Todo: Implement Date serialization
+  }
+
+  private parsePunctuation(tokens: Array<Token>) {
+    const value: any = tokens[this.currentPosition].value;
+    if (value === "[") {
+      return this.parseArray(tokens);
+    } else if (value === "{") {
+      return this.parseObject(tokens);
+    }
+  }
+
+  private parseBoolean(tokens: Array<Token>): boolean {
+    const value = tokens[this.currentPosition].value;
+
+    if (typeof value === "boolean") {
+      this.currentPosition++;
+      return value;
+    }
+
+    if (typeof value === "string") {
+      const isTrue = value.startsWith("true");
+      const isFalse = value.startsWith("false");
+
+      if (isTrue || isFalse) {
+        this.currentPosition++;
+        return isTrue;
+      }
+
+      throw new SyntaxError("Invalid boolean value");
+    }
+
+    throw new SyntaxError("Invalid boolean value");
+  }
+
+
+  private parseNull() {
+    this.currentPosition++;
+    return null;
+  }
+
   private parseObject(tokens: any[]) {
     const obj: { [key: string]: any } = {};
 
-    if (tokens[this.position].value !== "{") {
+    if (tokens[this.currentPosition].value !== "{") {
       throw new SyntaxError("Invalid object structure");
     }
 
-    this.position++;
+    this.currentPosition++; // Move past the opening brace
 
-    while (tokens[this.position]?.value !== "}") {
+    while (tokens[this.currentPosition].value !== "}") {
+      // Parse key
       const key = this.parseValue(tokens);
-      if (typeof key !== "string") {
-        String(key);
-      }
 
-      if (!key || tokens[this.position + 1]?.value !== ":") {
+      if (
+        typeof key !== "string" ||
+        tokens[this.currentPosition].value !== ":"
+      ) {
         throw new SyntaxError("Invalid object structure");
       }
-      this.position++; // Move past key and ":"
 
+      this.currentPosition++; // Move past the key and ":"
+
+      // Parse value
       const value = this.parseValue(tokens);
       obj[key] = value;
 
-      if (tokens[this.position]?.value === ",") {
-        this.position++; // Move past ","
-      } else if (tokens[this.position]?.value !== "}") {
-        throw new SyntaxError("Missing closing brace for object");
+      if (tokens[this.currentPosition].value === ",") {
+        this.currentPosition++; // Move past the ","
+      } else if (tokens[this.currentPosition].value !== "}") {
+        throw new SyntaxError("Missing comma after key");
       }
     }
-    this.position++; // Move past the closing brace
+
+    this.currentPosition++; // Move past the closing brace
     return obj;
   }
-  /**
-   * Parses a JSON string from tokens.
-   * @param {any[]} tokens - Array of token objects.
-   * @returns {string} Parsed JavaScript string.
-   */
+
   private parseString(tokens: any[]) {
-    if (tokens[this.position]?.type === TOKEN_TYPES.String) {
-      const value = tokens[this.position]?.value;
-      this.position++;
+    if (tokens[this.currentPosition].type === TOKEN_TYPES.String) {
+      const value = tokens[this.currentPosition].value;
+      this.currentPosition++;
       return value;
     } else {
       throw new SyntaxError("Invalid string");
     }
   }
 
-  /**
-   * Parses a JSON array from tokens.
-   * @param {any[]} tokens - Array of token objects.
-   * @returns {any[]} Parsed JavaScript array.
-   */
   private parseArray(tokens: any[]) {
     const arr: any[] = [];
 
-    if (tokens[this.position].value !== "]") {
+    if (tokens[this.currentPosition].value !== "[") {
       throw new SyntaxError("Invlid array structure");
     }
 
-    this.position++;
+    this.currentPosition++;
 
-    while (tokens[this.position]?.value !== "]") {
+    while (tokens[this.currentPosition].value !== "]") {
       const value = this.parseValue(tokens);
       arr.push(value);
-      if (tokens[this.position]?.value === ",") {
-        this.position++; // Move past ","
+      if (tokens[this.currentPosition].value === ",") {
+        this.currentPosition++; // Move past ","
       }
     }
-    if (tokens[this.position]?.value !== "]") {
+    if (tokens[this.currentPosition].value !== "]") {
       throw new SyntaxError("Missing closing bracket for array");
     }
 
-    this.position++; // Move past the closing bracket
+    this.currentPosition++; // Move past the closing bracket
     return arr;
   }
-  /**
-   * Parses a JSON true value from tokens.
-   * @param {any[]} tokens - Array of token objects.
-   * @returns {boolean} Parsed JavaScript true value.
-   */
-  private parseTrue(tokens: any[]) {
-    if (tokens[this.position]?.value === "true") {
-      this.position++;
-      return true;
-    }
-    throw new SyntaxError("Invalid true value");
-  }
-  /**
-   * Parses a JSON false value from tokens.
-   * @param {any[]} tokens - Array of token objects.
-   * @returns {boolean} Parsed JavaScript false value.
-   */
-  private parseFalse(tokens: any[]) {
-    if (tokens[this.position]?.value === "false") {
-      this.position++;
-      return false;
-    }
-    throw new SyntaxError("Invalid false value");
-  }
-  /**
-   * Parses a JSON number from tokens.
-   * @param {any[]} tokens - Array of token objects.
-   * @returns {number} Parsed JavaScript number.
-   */
+
   private parseNumber(tokens: any[]) {
-    const tokenValue = tokens[this.position].value;
+    const tokenValue = tokens[this.currentPosition].value;
     const num = Number(tokenValue);
 
     if (isNaN(num)) {
@@ -383,7 +331,7 @@ export class _JSON {
       throw new SyntaxError("Invalid JSON number format");
     }
 
-    this.position++;
+    this.currentPosition++;
     return num;
   }
 }
