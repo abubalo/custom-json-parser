@@ -60,9 +60,7 @@ export class _JSON {
         }
 
         if (currentPosition === jsonString.length) {
-          throw new SyntaxError(
-            "Unterminated string at currentPosition " + currentPosition
-          );
+          throw new SyntaxError(`Unterminated string at position ${currentPosition}`);
         }
 
         tokens.push({ type: TOKEN_TYPES.String, value: stringValue });
@@ -105,8 +103,7 @@ export class _JSON {
       }
 
       // If none of the above, it's likely a syntax error in the JSON
-      console.log(`Unexpected character: ${char}`);
-      throw new SyntaxError(`Unexpected character: ${char} in JSON`);
+      throw new SyntaxError(`Unexpected character: ${char} at position ${currentPosition} in JSON`);
     }
 
     return tokens;
