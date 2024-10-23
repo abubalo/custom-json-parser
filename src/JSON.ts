@@ -131,25 +131,21 @@ export class _JSON {
         continue;
       }
 
-      // Handle structural tokens
       if (this.isStructuralChar(char)) {
         tokens.push(this.tokenizeStructural());
         continue;
       }
 
-      // Handle strings
       if (char === '"') {
         tokens.push(this.tokenizeString());
         continue;
       }
 
-      // Handle numbers
       if (this.isNumberStart(char)) {
         tokens.push(this.tokenizeNumber());
         continue;
       }
 
-      // Handle literals
       if (this.isLiteralStart(char)) {
         tokens.push(this.tokenizeLiteral());
         continue;
@@ -161,7 +157,6 @@ export class _JSON {
     return tokens;
   }
 
-  // Token parsing methods
   private tokenizeStructural(): Token {
     const char = this.input[this.position];
     const token: Token = {
