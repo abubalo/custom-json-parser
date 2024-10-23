@@ -146,7 +146,6 @@ export class _JSON {
     ) {
       return this.serializePrimitive(value);
     } else {
-      // Handle other tokens datatypes (date, custom objects, etc.) accordingly
       return ""; // Placeholder for other tokens datatypes
     }
   }
@@ -185,7 +184,6 @@ export class _JSON {
   }
 
   private serializePrimitive(value: number | boolean | null): string {
-    // return `${value}`;
 
     switch (value) {
       case null:
