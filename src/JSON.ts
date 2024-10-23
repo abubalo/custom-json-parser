@@ -1,332 +1,455 @@
-const TOKEN_TYPES = {
-  Punctuation: "punctuation",
-  String: "string",
-  Number: "number",
-  Boolean: "boolean",
-  Null: "null",
-  Date: "date",
-  Binary: "binary",
-} as const;
+type JsonPrimitive = string | number | boolean | null;
+type JsonValue = JsonPrimitive | JsonObject | JsonArray | Date;
+type JsonObject = { [key: string]: JsonValue };
+type JsonArray = JsonValue[];
 
-type Token<T = any> = {
-  type: string;
-  value: T;
-};
+const enum TokenType {
+  LeftBrace = "{",
+  RightBrace = "}",
+  LeftBracket = "[",
+  RightBracket = "]",
+  Colon = ":",
+  Comma = ",",
+  String = "string",
+  Number = "number",
+  Boolean = "boolean",
+  Null = "null",
+  Date = "date",
+}
+
+interface Token {
+  type: TokenType;
+  value: string | number | boolean | null | Date;
+  position: number;
+}
+
+interface ParserOptions {
+  reviver?: (key: string, value: any) => any;
+  dateParser?: (value: string) => Date | null;
+}
+
+interface StringifyOptions {
+  replacer?: (key: string, value: any) => any;
+  space?: string | number;
+  dateSerializer?: (date: Date) => string;
+}
+
+class JSONParseError extends Error {
+  constructor(message: string, public position: number) {
+    super(`${message} at position ${position}`);
+    this.name = "JSONParseError";
+  }
+}
 
 export class _JSON {
-  private currentPosition: number = 0;
+  private static readonly NUMBER_PATTERN =
+    /^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$/;
+  private static readonly ESCAPE_MAP: Record<string, string> = {
+    '"': '"',
+    "\\": "\\",
+    "/": "/",
+    b: "\b",
+    f: "\f",
+    n: "\n",
+    r: "\r",
+    t: "\t",
+  };
 
-  private static createInstance(): _JSON {
-    return new _JSON();
+  private position = 0;
+  private input = "";
+  private tokens: Token[] = [];
+  private currentToken = 0;
+
+  public static parse(text: string, options: ParserOptions = {}): JsonValue {
+    const parser = new _JSON();
+    return parser.parse(text, options);
   }
 
-  public static parse(jsonStrings: any, callback?: () => void): _JSON {
-    const customJSON = _JSON.createInstance();
-    const tokens = customJSON.tokenize(jsonStrings);
-    return customJSON.parseValue(tokens);
+  public static stringify(
+    value: JsonValue,
+    options: StringifyOptions = {}
+  ): string {
+    const parser = new _JSON();
+    return parser.stringify(value, options);
   }
 
-  public static stringify(value: unknown, callback?: () => void): string {
-    const customJSON = _JSON.createInstance();
-    return customJSON.serializeValue(value);
+  private parse(text: string, options: ParserOptions): JsonValue {
+    this.input = text;
+    this.position = 0;
+    this.tokens = this.tokenize();
+
+    const value = this.parseValue();
+
+    if (options.reviver) {
+      const reviverWrapper = (obj: any) => {
+        const stack: any[] = [{ "": obj }];
+        const keys: string[] = [""];
+
+        while (stack.length > 0) {
+          const parent = stack[stack.length - 1];
+          const key = keys[keys.length - 1];
+          let value = parent[key];
+
+          if (value && typeof value === "object") {
+            const entries = Object.entries(value);
+            if (entries.length > 0) {
+              const [nextKey, nextValue] = entries[0];
+              delete value[nextKey];
+              stack.push(value);
+              keys.push(nextKey);
+              parent[key] = options.reviver!(nextKey, nextValue);
+              continue;
+            }
+          }
+
+          stack.pop();
+          keys.pop();
+          if (stack.length > 0) {
+            const parentKey = keys[keys.length - 1];
+            stack[stack.length - 1][parentKey] = options.reviver!(key, value);
+          }
+        }
+
+        return obj;
+      };
+
+      return reviverWrapper(value);
+    }
+
+    return value;
   }
 
-  private tokenize(jsonString: string) {
-    const tokens = [];
-    let currentPosition = 0;
+  private tokenize(): Token[] {
+    const tokens: Token[] = [];
 
-    while (currentPosition < jsonString.length) {
-      let char = jsonString[currentPosition];
+    while (this.position < this.input.length) {
+      const char = this.input[this.position];
 
-      // Skip whitespace characters
+      // Skip whitespace
       if (/\s/.test(char)) {
-        currentPosition++;
+        this.position++;
         continue;
       }
 
-      if ("[]{},:".includes(char)) {
-        tokens.push({ type: TOKEN_TYPES.Punctuation, value: char });
-        currentPosition++;
+      // Handle structural tokens
+      if (this.isStructuralChar(char)) {
+        tokens.push(this.tokenizeStructural());
         continue;
       }
 
+      // Handle strings
       if (char === '"') {
-        let stringValue = "";
-        currentPosition++; // Move past the opening quote
-
-        while (jsonString[currentPosition] !== '"') {
-          stringValue += jsonString[currentPosition];
-          currentPosition++;
-        }
-
-        if (currentPosition === jsonString.length) {
-          throw new SyntaxError(`Unterminated string at position ${currentPosition}`);
-        }
-
-        tokens.push({ type: TOKEN_TYPES.String, value: stringValue });
-        currentPosition++; // Move past the closing quote
+        tokens.push(this.tokenizeString());
         continue;
       }
 
-      if (/[\d-.]/.test(char)) {
-        let numberValue = "";
-
-        while (/[\d.eE+-]/.test(jsonString[currentPosition])) {
-          numberValue += jsonString[currentPosition];
-          currentPosition++;
-        }
-
-        tokens.push({
-          type: TOKEN_TYPES.Number,
-          value: parseFloat(numberValue),
-        });
+      // Handle numbers
+      if (this.isNumberStart(char)) {
+        tokens.push(this.tokenizeNumber());
         continue;
       }
 
-      // Handle true, false, null
-      if (jsonString.startsWith("true", currentPosition)) {
-        tokens.push({ type: TOKEN_TYPES.Boolean, value: true });
-        currentPosition += 4;
+      // Handle literals
+      if (this.isLiteralStart(char)) {
+        tokens.push(this.tokenizeLiteral());
         continue;
       }
 
-      if (jsonString.startsWith("false", currentPosition)) {
-        tokens.push({ type: TOKEN_TYPES.Boolean, value: false });
-        currentPosition += 5;
-        continue;
-      }
-
-      if (jsonString.startsWith("null", currentPosition)) {
-        tokens.push({ type: TOKEN_TYPES.Null, value: null });
-        currentPosition += 4;
-        continue;
-      }
-
-      // If none of the above, it's likely a syntax error in the JSON
-      throw new SyntaxError(`Unexpected character: ${char} at position ${currentPosition} in JSON`);
+      throw new JSONParseError(`Unexpected character '${char}'`, this.position);
     }
 
     return tokens;
   }
 
-  private parseValue(tokens: Array<Token>) {
-    const token = tokens[this.currentPosition];
-
-    switch (token.type) {
-      case TOKEN_TYPES.Punctuation:
-        return this.parsePunctuation(tokens);
-      case TOKEN_TYPES.String:
-        return this.parseString(tokens);
-      case TOKEN_TYPES.Number:
-        return this.parseNumber(tokens);
-      case TOKEN_TYPES.Boolean:
-        return this.parseBoolean(tokens);
-      case TOKEN_TYPES.Null:
-        return this.parseNull();
-      default:
-        throw new SyntaxError("Unexpected token type while parsing value");
-    }
+  // Token parsing methods
+  private tokenizeStructural(): Token {
+    const char = this.input[this.position];
+    const token: Token = {
+      type: char as TokenType,
+      value: char,
+      position: this.position,
+    };
+    this.position++;
+    return token;
   }
 
-  private serializeValue(value: any): string {
-    if (typeof value === "object" && value !== null) {
-      if (Array.isArray(value)) {
-        return this.serializeArray(value);
-      } else if (value instanceof Date) {
-        return `"${value.toISOString()}"`; // Serialize Date objects as ISO strings
+  private tokenizeString(): Token {
+    const startPos = this.position;
+    let value = "";
+    this.position++; // Skip opening quote
+
+    while (this.position < this.input.length) {
+      const char = this.input[this.position];
+
+      if (char === "\\") {
+        this.position++;
+        value += this.handleEscapeSequence();
+      } else if (char === '"') {
+        this.position++;
+        return {
+          type: TokenType.String,
+          value,
+          position: startPos,
+        };
       } else {
-        return this.serializeObject(value);
+        value += char;
+        this.position++;
       }
-    } else if (typeof value === "string") {
-      return this.serializeString(value);
-    } else if (
-      typeof value === "number" ||
-      typeof value === "boolean" ||
-      value === null
-    ) {
-      return this.serializePrimitive(value);
-    } else {
-      return ""; // Placeholder for other tokens datatypes
     }
+
+    throw new JSONParseError("Unterminated string", startPos);
   }
 
-  private serializeObject(obj: any): string {
-    const keys = Object.keys(obj);
-    const serializedKeys = keys.map(
-      (key) => `"${key}": ${this.serializeValue(obj[key])}`
-    );
-    return `{${serializedKeys.join(", ")}}`;
+  private tokenizeNumber(): Token {
+    const startPos = this.position;
+    let numberStr = "";
+
+    while (
+      this.position < this.input.length &&
+      this.isNumberChar(this.input[this.position])
+    ) {
+      numberStr += this.input[this.position];
+      this.position++;
+    }
+
+    if (!_JSON.NUMBER_PATTERN.test(numberStr)) {
+      throw new JSONParseError("Invalid number format", startPos);
+    }
+
+    const value = parseFloat(numberStr);
+    if (!Number.isFinite(value)) {
+      throw new JSONParseError("Invalid number value", startPos);
+    }
+
+    return {
+      type: TokenType.Number,
+      value,
+      position: startPos,
+    };
   }
 
-  private serializeArray(arr: any[]): string {
-    const serializeValues = arr.map((value) => this.serializeValue(value));
-    return `[${serializeValues.join(", ")}]`;
-  }
-
-  private serializeString(value: string): string {
-    const escapeChars: Record<string, string> = {
-      '"': '\\"',
-      "\\": "\\\\",
-      "\b": "\\b",
-      "\f": "\\f",
-      "\n": "\\n",
-      "\r": "\\r",
-      "\t": "\\t",
+  private tokenizeLiteral(): Token {
+    const startPos = this.position;
+    const literals = {
+      true: { type: TokenType.Boolean, value: true },
+      false: { type: TokenType.Boolean, value: false },
+      null: { type: TokenType.Null, value: null },
     };
 
-    const escapedValue = value.replace(
-      /[\u0000-\u001F"\\]/g,
-      (match) =>
-        escapeChars[match] ||
-        `\\u${("0000" + match.charCodeAt(0).toString(16)).slice(-4)}`
-    );
-    return `"${escapedValue}"`;
+    for (const [literal, token] of Object.entries(literals)) {
+      if (this.input.startsWith(literal, this.position)) {
+        this.position += literal.length;
+        return { ...token, position: startPos };
+      }
+    }
+
+    throw new JSONParseError("Invalid literal", startPos);
   }
 
-  private serializePrimitive(value: number | boolean | null): string {
+  private parseValue(): JsonValue {
+    const token = this.tokens[this.currentToken];
 
-    switch (value) {
-      case null:
-        return "null"; // Serialize null as 'null'
-      case true:
-        return "true"; // Serialize boolean true as 'true'
-      case false:
-        return "false"; // Serialize boolean false as 'false'
+    switch (token.type) {
+      case TokenType.LeftBrace:
+        return this.parseObject();
+      case TokenType.LeftBracket:
+        return this.parseArray();
+      case TokenType.String:
+      case TokenType.Number:
+      case TokenType.Boolean:
+      case TokenType.Null:
+        this.currentToken++;
+        return token.value as JsonValue;
       default:
-        return `${value}`; // Serialize finite numbers as their string representation
+        throw new JSONParseError("Unexpected token", token.position);
     }
   }
 
-  private serializeDate(value: Date) {
-    //Todo: Implement Date serialization
-  }
+  private parseObject(): JsonObject {
+    const obj: JsonObject = {};
+    this.currentToken++; // Skip the first opening curly brace'{'
 
-  private parsePunctuation(tokens: Array<Token>) {
-    const value: any = tokens[this.currentPosition].value;
-    if (value === "[") {
-      return this.parseArray(tokens);
-    } else if (value === "{") {
-      return this.parseObject(tokens);
-    }
-  }
-
-  private parseBoolean(tokens: Array<Token>): boolean {
-    const value = tokens[this.currentPosition].value;
-
-    if (typeof value === "boolean") {
-      this.currentPosition++;
-      return value;
-    }
-
-    if (typeof value === "string") {
-      const isTrue = value.startsWith("true");
-      const isFalse = value.startsWith("false");
-
-      if (isTrue || isFalse) {
-        this.currentPosition++;
-        return isTrue;
+    while (this.currentToken < this.tokens.length) {
+      if (this.tokens[this.currentToken].type === TokenType.RightBrace) {
+        this.currentToken++;
+        return obj;
       }
 
-      throw new SyntaxError("Invalid boolean value");
-    }
-
-    throw new SyntaxError("Invalid boolean value");
-  }
-
-
-  private parseNull() {
-    this.currentPosition++;
-    return null;
-  }
-
-  private parseObject(tokens: any[]) {
-    const obj: { [key: string]: any } = {};
-
-    if (tokens[this.currentPosition].value !== "{") {
-      throw new SyntaxError("Invalid object structure");
-    }
-
-    this.currentPosition++; // Move past the opening brace
-
-    while (tokens[this.currentPosition].value !== "}") {
-      // Parse key
-      const key = this.parseValue(tokens);
-
-      if (
-        typeof key !== "string" ||
-        tokens[this.currentPosition].value !== ":"
-      ) {
-        throw new SyntaxError("Invalid object structure");
+      const keyToken = this.tokens[this.currentToken];
+      if (keyToken.type !== TokenType.String) {
+        throw new JSONParseError(
+          "Object key must be a string",
+          keyToken.position
+        );
       }
+      const key = keyToken.value as string;
+      this.currentToken++;
 
-      this.currentPosition++; // Move past the key and ":"
+      const colonToken = this.tokens[this.currentToken];
+      if (colonToken.type !== TokenType.Colon) {
+        throw new JSONParseError('Expected ":"', colonToken.position);
+      }
+      this.currentToken++;
 
-      // Parse value
-      const value = this.parseValue(tokens);
-      obj[key] = value;
+      obj[key] = this.parseValue();
 
-      if (tokens[this.currentPosition].value === ",") {
-        this.currentPosition++; // Move past the ","
-      } else if (tokens[this.currentPosition].value !== "}") {
-        throw new SyntaxError("Missing comma after key");
+      const nextToken = this.tokens[this.currentToken];
+      if (nextToken.type === TokenType.Comma) {
+        this.currentToken++;
+      } else if (nextToken.type !== TokenType.RightBrace) {
+        throw new JSONParseError('Expected "," or "}"', nextToken.position);
       }
     }
 
-    this.currentPosition++; // Move past the closing brace
-    return obj;
+    throw new JSONParseError("Unterminated object", this.tokens[0].position);
   }
 
-  private parseString(tokens: any[]) {
-    if (tokens[this.currentPosition].type === TOKEN_TYPES.String) {
-      const value = tokens[this.currentPosition].value;
-      this.currentPosition++;
-      return value;
-    } else {
-      throw new SyntaxError("Invalid string");
-    }
-  }
+  private parseArray(): JsonArray {
+    const arr: JsonArray = [];
+    this.currentToken++; // Skip '['
 
-  private parseArray(tokens: any[]) {
-    const arr: any[] = [];
+    while (this.currentToken < this.tokens.length) {
+      if (this.tokens[this.currentToken].type === TokenType.RightBracket) {
+        this.currentToken++;
+        return arr;
+      }
 
-    if (tokens[this.currentPosition].value !== "[") {
-      throw new SyntaxError("Invlid array structure");
-    }
+      arr.push(this.parseValue());
 
-    this.currentPosition++;
-
-    while (tokens[this.currentPosition].value !== "]") {
-      const value = this.parseValue(tokens);
-      arr.push(value);
-      if (tokens[this.currentPosition].value === ",") {
-        this.currentPosition++; // Move past ","
+      const nextToken = this.tokens[this.currentToken];
+      if (nextToken.type === TokenType.Comma) {
+        this.currentToken++;
+      } else if (nextToken.type !== TokenType.RightBracket) {
+        throw new JSONParseError('Expected "," or "]"', nextToken.position);
       }
     }
-    if (tokens[this.currentPosition].value !== "]") {
-      throw new SyntaxError("Missing closing bracket for array");
-    }
 
-    this.currentPosition++; // Move past the closing bracket
-    return arr;
+    throw new JSONParseError("Unterminated array", this.tokens[0].position);
   }
 
-  private parseNumber(tokens: any[]) {
-    const tokenValue = tokens[this.currentPosition].value;
-    const num = Number(tokenValue);
+  private stringify(value: JsonValue, options: StringifyOptions): string {
+    const indent = this.resolveIndent(options.space);
+    return this.stringifyValue(value, options, indent, 0);
+  }
 
-    if (isNaN(num)) {
-      throw new SyntaxError("Invalid number");
+  private stringifyValue(
+    value: JsonValue,
+    options: StringifyOptions,
+    indent: string,
+    level: number
+  ): string {
+    if (value === null) return "null";
+    if (typeof value === "boolean") return value.toString();
+    if (typeof value === "number") return this.stringifyNumber(value);
+    if (typeof value === "string") return this.stringifyString(value);
+    if (value instanceof Date) {
+      return options.dateSerializer
+        ? options.dateSerializer(value)
+        : `"${value.toISOString()}"`;
+    }
+    if (Array.isArray(value)) {
+      return this.stringifyArray(value, options, indent, level);
+    }
+    return this.stringifyObject(value as JsonObject, options, indent, level);
+  }
+
+  private isStructuralChar(char: string): boolean {
+    return "{[]}:,".includes(char);
+  }
+
+  private isNumberStart(char: string): boolean {
+    return /[-0-9]/.test(char);
+  }
+
+  private isNumberChar(char: string): boolean {
+    return /[-0-9.eE+]/.test(char);
+  }
+
+  private isLiteralStart(char: string): boolean {
+    return /[tfn]/.test(char);
+  }
+
+  private handleEscapeSequence(): string {
+    const char = this.input[this.position];
+    if (char === "u") {
+      const sequence = this.input.slice(this.position + 1, this.position + 5);
+      if (!/^[0-9a-fA-F]{4}$/.test(sequence)) {
+        throw new JSONParseError(
+          "Invalid Unicode escape sequence",
+          this.position - 1
+        );
+      }
+      this.position += 5;
+      return String.fromCharCode(parseInt(sequence, 16));
     }
 
-    // Validate if the token value matches the JSON number format
-    const isValidJSONNumber =
-      /^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(tokenValue);
-
-    if (!isValidJSONNumber) {
-      throw new SyntaxError("Invalid JSON number format");
+    const escaped = _JSON.ESCAPE_MAP[char];
+    if (!escaped) {
+      throw new JSONParseError("Invalid escape sequence", this.position - 1);
     }
+    this.position++;
+    return escaped;
+  }
 
-    this.currentPosition++;
-    return num;
+  private stringifyNumber(num: number): string {
+    return Number.isFinite(num) ? String(num) : "null";
+  }
+
+  private stringifyString(str: string): string {
+    return `"${str.replace(/[\u0000-\u001f"\\]/g, (char) => {
+      const escaped = _JSON.ESCAPE_MAP[char];
+      return (
+        escaped || `\\u${("0000" + char.charCodeAt(0).toString(16)).slice(-4)}`
+      );
+    })}"`;
+  }
+
+  private stringifyArray(
+    arr: JsonArray,
+    options: StringifyOptions,
+    indent: string,
+    level: number
+  ): string {
+    if (arr.length === 0) return "[]";
+
+    const items = arr.map(
+      (item) =>
+        `${indent.repeat(level + 1)}${this.stringifyValue(
+          item,
+          options,
+          indent,
+          level + 1
+        )}`
+    );
+
+    return ["[", items.join(",\n"), `${indent.repeat(level)}]`].join("\n");
+  }
+
+  private stringifyObject(
+    obj: JsonObject,
+    options: StringifyOptions,
+    indent: string,
+    level: number
+  ): string {
+    const entries = Object.entries(obj);
+    if (entries.length === 0) return "{}";
+
+    const items = entries.map(
+      ([key, value]) =>
+        `${indent.repeat(level + 1)}${this.stringifyString(key)}: ` +
+        this.stringifyValue(value, options, indent, level + 1)
+    );
+
+    return ["{", items.join(",\n"), `${indent.repeat(level)}}`].join("\n");
+  }
+
+  private resolveIndent(space: string | number | undefined): string {
+    if (typeof space === "number") {
+      return " ".repeat(Math.max(0, Math.min(10, Math.floor(space))));
+    }
+    if (typeof space === "string") {
+      return space.slice(0, 10);
+    }
+    return "";
   }
 }
